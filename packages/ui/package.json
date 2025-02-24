@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./*": "./src/*.tsx"
+    "./card": "./src/card.tsx",
+    "./checkout-card": "./src/checkout-card.tsx",
+    "./button": "./src/button.tsx",
+    "./utils": "./src/utils.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -15,13 +18,15 @@
     "@repo/typescript-config": "*",
     "@turbo/gen": "^2.4.0",
     "@types/node": "^22.13.0",
-    "@types/react": "19.0.8",
-    "@types/react-dom": "19.0.3",
-    "eslint": "^9.20.0",
-    "typescript": "5.7.3"
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "clsx": "^2.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^2.2.1"
   }
 }
