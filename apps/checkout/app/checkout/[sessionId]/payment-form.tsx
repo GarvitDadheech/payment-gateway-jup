@@ -6,7 +6,7 @@ import { PublicKey, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js"
 import { Button } from "@repo/ui/button"
 import { Buffer } from "buffer"
 import { TokenSelector } from "../../components/token-selector"
-import { SUPPORTED_TOKENS, Token, DEFAULT_TOKEN } from "../../config/tokens"
+import { SUPPORTED_TOKENS, Token } from "../../config/tokens"
 
 interface PaymentFormProps {
   amount: number
@@ -15,7 +15,16 @@ interface PaymentFormProps {
 }
 
 // Using Devnet USDC mint address for merchant payment
-const MERCHANT_TOKEN = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+const MERCHANT_TOKEN = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+
+// Add a default token to ensure we always have a valid initial state
+const DEFAULT_TOKEN: Token = {
+  symbol: "SOL",
+  name: "Solana",
+  mint: "So11111111111111111111111111111111111111112",
+  decimals: 9,
+  logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"
+}
 
 export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormProps) {
   const { connection } = useConnection()
