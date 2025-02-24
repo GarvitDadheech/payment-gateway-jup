@@ -7,6 +7,7 @@ import { Button } from "@repo/ui/button"
 import { Buffer } from "buffer"
 import { TokenSelector } from "../../components/token-selector"
 import { SUPPORTED_TOKENS, Token } from "../../config/tokens"
+import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token"
 
 interface PaymentFormProps {
   amount: number
@@ -15,7 +16,7 @@ interface PaymentFormProps {
 }
 
 // Using Devnet USDC mint address for merchant payment
-const MERCHANT_TOKEN = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+const MERCHANT_TOKEN = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
 // Add a default token to ensure we always have a valid initial state
 const DEFAULT_TOKEN: Token = {
@@ -37,11 +38,11 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       alert("Please connect your wallet first!")
       return
     }
-    
+    console.log(merchantAddress);
     setLoading(true)
     try {
       // 1. Get quote from Jupiter
-      const quoteApi = `https://quote-api.jup.ag/v6/quote?inputMint=${selectedToken.mint}&outputMint=${MERCHANT_TOKEN}&amount=${amount * Math.pow(10, selectedToken.decimals)}&slippageBps=50`
+      const quoteApi = `https://quote-api.jup.ag/v6/quote?inputMint=${selectedToken.mint}&outputMint=${MERCHANT_TOKEN}&amount=${(amount+0.0001) * Math.pow(10, 6)}&slippageBps=50&swapMode=ExactOut`
       console.log("Fetching quote from:", quoteApi)
 
       const quoteResponse = await (await fetch(quoteApi)).json()
@@ -50,9 +51,9 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       if (quoteResponse.error) {
         throw new Error(`Quote error: ${quoteResponse.error}`)
       }
-
+      console.log(quoteResponse);
       // Show quote details to user
-      const inputAmount = amount
+      const inputAmount = quoteResponse.inAmount / Math.pow(10, selectedToken.decimals)
       const outputAmount = quoteResponse.outAmount / Math.pow(10, 6) // USDC has 6 decimals
       const priceImpact = quoteResponse.priceImpactPct
       
@@ -79,7 +80,7 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
 
       console.log("Sending swap request:", swapRequestBody)
 
-      const swapResponse = await fetch('https://api.jup.ag/v6/swap', {
+      const swapResponse = await fetch('https://api.jup.ag/swap/v1/swap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -92,15 +93,15 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
         throw new Error(`Swap API error: ${errorText}`)
       }
 
-      const swapData = await swapResponse.json()
-      console.log("Swap response:", swapData)
+      const { swapTransaction } = await swapResponse.json()
+      console.log("Swap response:", swapTransaction)
 
-      if (!swapData.swapTransaction) {
+      if (!swapTransaction) {
         throw new Error("No swap transaction returned from Jupiter")
       }
 
       // 3. Deserialize the transaction
-      const swapTransactionBuf = Buffer.from(swapData.swapTransaction, 'base64')
+      const swapTransactionBuf = Buffer.from(swapTransaction, 'base64')
       const transaction = Transaction.from(swapTransactionBuf)
 
       // 4. Add recent blockhash and fee payer
@@ -108,6 +109,19 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       transaction.recentBlockhash = blockhash
       transaction.feePayer = publicKey
 
+
+      const senderTokenAccount = await getAssociatedTokenAddress(new PublicKey(MERCHANT_TOKEN), publicKey);  // Sender's token account
+      const receiverTokenAccount = await getAssociatedTokenAddress(new PublicKey(MERCHANT_TOKEN), new PublicKey(merchantAddress)); // Receiver's token account
+      console.log("Sender Token Account:", senderTokenAccount.toString())
+      console.log("Receiver Token Account:", receiverTokenAccount.toString())
+      const transferInstruction = createTransferInstruction(
+        senderTokenAccount,
+        receiverTokenAccount,
+        publicKey,
+        amount
+      );
+      //Adding the transfer instruction to the transaction so both the swap and transfer are executed together atomically
+      transaction.add(transferInstruction);
       // 5. Send the transaction to the network
       // This will trigger the wallet popup for user to confirm
       const signature = await sendTransaction(transaction, connection, {
@@ -154,7 +168,7 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
         disabled={loading}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full font-medium"
       >
-        {loading ? "Processing Payment..." : `Pay ${amount} ${selectedToken.symbol}`}
+        {loading ? "Processing Payment..." : `Pay $${amount} in ${selectedToken.symbol}`}
       </Button>
     </div>
   )
