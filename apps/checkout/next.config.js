@@ -1,4 +1,17 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
-
-export default nextConfig;
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+        pathname: '/solana-labs/token-list/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'arweave.net',
+        pathname: '/**',
+      },
+    ],
+  },
+}
