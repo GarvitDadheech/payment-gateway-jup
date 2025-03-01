@@ -17,14 +17,14 @@ export const SUPPORTED_TOKENS: Token[] = [
   {
     symbol: "USDC",
     name: "USD Coin",
-    mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Devnet USDC
+    mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     decimals: 6,
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png"
   },
   {
     symbol: "BONK",
     name: "Bonk",
-    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", // Devnet
+    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     decimals: 5,
     logoURI: "https://arweave.net/hQB7PMqg6Su6WBa6loGzBQqoNaBKhppLqQZjMqtaTjE"
   },
