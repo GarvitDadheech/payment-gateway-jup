@@ -1,8 +1,8 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import prisma from "@repo/db";
-import { DashboardNav } from "@/components/dashboard/dashboard-nav";
-import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { DashboardNav } from "../../components/dashboard/dashboard-nav";
+import { DashboardHeader } from "../../components/dashboard/dashboard-header";
 
 export default async function DashboardLayout({
   children,
@@ -16,12 +16,11 @@ export default async function DashboardLayout({
   }
   
   // Check if user has completed onboarding
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    include: { merchant: true },
+  const user = await prisma.merchant.findUnique({
+    where: { email: session.user.email }
   });
   
-  if (!user?.merchant) {
+  if (!user?.wallet) {
     redirect("/onboarding");
   }
   

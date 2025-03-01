@@ -1,5 +1,5 @@
 import { Transaction } from "@prisma/client";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "../../lib/utils";
 
 interface RecentTransactionsProps {
   transactions: Transaction[];

@@ -13,24 +13,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  name      String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  merchant  Merchant?
+model Merchant {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  wallet      String?  @unique // Optional initially
+  token       String?  // Optional initially
+  apiKeys     ApiKey[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-model Merchant {
+model ApiKey {
   id          String        @id @default(cuid())
-  userId      String        @unique
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  description String
-  wallet      String        @unique
-  token       String
-  apiKey      String        @unique
+  key         String        @unique
+  merchantId  String
+  merchant    Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   transactions Transaction[]
@@ -38,8 +36,8 @@ model Merchant {
 
 model Transaction {
   id         String   @id @default(cuid())
-  merchantId String
-  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  apiKeyId   String
+  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
   fromWallet String
   toWallet   String
   amount     Decimal

@@ -1,24 +1,24 @@
 import { getServerSession } from "next-auth";
 import prisma from "@repo/db";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Overview } from "@/components/dashboard/overview";
-import { RecentTransactions } from "@/components/dashboard/recent-transactions";
-import { formatCurrency } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Overview } from "../../components/dashboard/overview";
+import { RecentTransactions } from "../../components/dashboard/recent-transactions";
+import { formatCurrency } from "../../lib/utils";
 
 export default async function DashboardPage() {
   const session = await getServerSession();
-  
-  if (!session?.user?.email) {
-    return null;
+  console.log(session);
+  if (!session?.user.email) {
+    return <p> no user</p>;
   }
   
-  const user = await prisma.user.findUnique({
+  const user = await prisma.merchant.findUnique({
     where: { email: session.user.email },
     include: { merchant: true },
   });
   
-  if (!user?.merchant) {
+  if (!user) {
     return null;
   }
   
