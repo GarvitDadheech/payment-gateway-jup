@@ -10,7 +10,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMerchant } from "./actions";
+import { createMerchant, getMerchant } from "./actions";
+import { useSession } from "next-auth/react";
+import prisma from "@repo/db";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -24,27 +26,37 @@ type FormValues = z.infer<typeof formSchema>;
 export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      wallet: "",
-      token: "",
-    },
-  });
+  const { data: session } = useSession();
+  const [user, setUser] = useState(null);
+  const [name, setName] = useState("");
+  const [token, setToken] = useState("");
+  const [merchantWallet, setMerchantWallet] = useState("");
+  if(!session?.user?.email) {
+    router.push("/auth/login");
+    return null;
+  }
+  useEffect(()=>{
+    if(session.user.email){
+      const fetchUser = async () => {
+        console.log(session.user.email);
+        const merchant = await getMerchant();
+        setUser(merchant.user);
+        setName(merchant.user.name);
+      };
+      fetchUser();
+    }
+  }, [session]);
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await createMerchant(data);
-      router.push("/dashboard");
+      createMerchant({
+        name,
+        wallet: merchantWallet,
+        token: token,
+      }).then((res) => {
+        router.push("/dashboard");
+      });
     } catch (error) {
       console.error("Error creating merchant:", error);
       setIsSubmitting(false);
@@ -55,34 +67,19 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex items-center justify-center bg-secondary/20 py-12">
       <div className="bg-background p-8 rounded-lg shadow-sm max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Complete Your Merchant Profile</h1>
+          <h1 className="text-2xl font-bold">Hii! {user?.name} Complete Your Merchant Profile</h1>
           <p className="text-muted-foreground mt-2">Tell us about your business to get started</p>
         </div>
         
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={()=> onSubmit()} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="name">Merchant Name</Label>
             <Input
               id="name"
               placeholder="Your business name"
-              {...register("name")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
-            {errors.name && (
-              <p className="text-sm text-destructive">{errors.name.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="description">What does your company do?</Label>
-            <Textarea
-              id="description"
-              placeholder="Briefly describe your business and what you sell"
-              {...register("description")}
-              className="min-h-[100px]"
-            />
-            {errors.description && (
-              <p className="text-sm text-destructive">{errors.description.message}</p>
-            )}
           </div>
           
           <div className="space-y-2">
@@ -90,17 +87,16 @@ export default function OnboardingPage() {
             <Input
               id="wallet"
               placeholder="Your Solana wallet address"
-              {...register("wallet")}
+              value={merchantWallet}
+              onChange={(e) => setMerchantWallet(e.target.value)}
             />
-            {errors.wallet && (
-              <p className="text-sm text-destructive">{errors.wallet.message}</p>
-            )}
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="token">Token Type for Payments</Label>
             <Select 
-              onValueChange={(value) => setValue("token", value)}
+              value={token}
+              onValueChange={(value) => setToken(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select token" />
@@ -108,12 +104,8 @@ export default function OnboardingPage() {
               <SelectContent>
                 <SelectItem value="SOL">SOL</SelectItem>
                 <SelectItem value="USDC">USDC</SelectItem>
-                <SelectItem value="BOTH">Both SOL & USDC</SelectItem>
               </SelectContent>
             </Select>
-            {errors.token && (
-              <p className="text-sm text-destructive">{errors.token.message}</p>
-            )}
           </div>
           
           <Button type="submit" className="w-full" disabled={isSubmitting}>

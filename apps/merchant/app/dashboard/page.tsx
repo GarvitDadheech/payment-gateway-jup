@@ -15,7 +15,6 @@ export default async function DashboardPage() {
   
   const user = await prisma.merchant.findUnique({
     where: { email: session.user.email },
-    include: { merchant: true },
   });
   
   if (!user) {
