@@ -7,7 +7,12 @@ import { Button } from "@repo/ui/button"
 import { Buffer } from "buffer"
 import { TokenSelector } from "../../components/token-selector"
 import { SUPPORTED_TOKENS, Token } from "../../config/tokens"
-import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token"
+import { 
+  createTransferInstruction, 
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+  getAccount
+} from "@solana/spl-token"
 
 interface PaymentFormProps {
   amount: number
@@ -15,10 +20,10 @@ interface PaymentFormProps {
   onSuccess: () => void
 }
 
-// Using Devnet USDC mint address for merchant payment
+// Using USDC mint address for merchant payment
 const MERCHANT_TOKEN = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
-// Add a default token to ensure we always have a valid initial state
+
 const DEFAULT_TOKEN: Token = {
   symbol: "SOL",
   name: "Solana",
@@ -38,7 +43,7 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       alert("Please connect your wallet first!")
       return
     }
-    console.log(merchantAddress);
+    
     setLoading(true)
     try {
       // 1. Get quote from Jupiter
@@ -51,29 +56,41 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       if (quoteResponse.error) {
         throw new Error(`Quote error: ${quoteResponse.error}`)
       }
-      console.log(quoteResponse);
+
       // Show quote details to user
       const inputAmount = quoteResponse.inAmount / Math.pow(10, selectedToken.decimals)
       const outputAmount = quoteResponse.outAmount / Math.pow(10, 6) // USDC has 6 decimals
       const priceImpact = quoteResponse.priceImpactPct
       
       const proceed = window.confirm(
-        `You will pay:\n${inputAmount} ${selectedToken.symbol}\n\nMerchant receives:\n${outputAmount.toFixed(2)} USDC\n\nPrice Impact: ${(priceImpact * 100).toFixed(2)}%\n\nProceed with transaction?`
+        `You will pay:\n${inputAmount.toFixed(4)} ${selectedToken.symbol}\n\nMerchant receives:\n${outputAmount.toFixed(2)} USDC\n\nPrice Impact: ${(priceImpact * 100).toFixed(2)}%\n\nProceed with transaction?`
       )
 
       if (!proceed) {
         throw new Error("Transaction cancelled by user")
       }
 
-      // Convert amount to lamports (Jupiter expects amounts in smallest units)
-      const inputAmountInLamports = amount * Math.pow(10, selectedToken.decimals)
+      // 2. Get merchant's USDC token account
+      const merchantPubKey = new PublicKey(merchantAddress)
+      const merchantTokenAccount = await getAssociatedTokenAddress(
+        new PublicKey(MERCHANT_TOKEN),
+        merchantPubKey
+      )
+      
+      // Check if merchant token account exists
+      let merchantAccountExists = true
+      try {
+        await getAccount(connection, merchantTokenAccount)
+      } catch (error) {
+        merchantAccountExists = false
+      }
 
-      // 2. Get serialized transactions for the swap
+      // 3. Set up the swap with direct merchant deposit using routeSwapOptions
       const swapRequestBody = {
         quoteResponse,
         userPublicKey: publicKey.toString(),
+        destinationTokenAccount: merchantTokenAccount.toString(),
         wrapUnwrapSOL: true,
-        // Use lower compute unit price for devnet
         computeUnitPriceMicroLamports: 100,
         asLegacyTransaction: true
       }
@@ -94,36 +111,30 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       }
 
       const { swapTransaction } = await swapResponse.json()
-      console.log("Swap response:", swapTransaction)
-
+      
       if (!swapTransaction) {
         throw new Error("No swap transaction returned from Jupiter")
       }
 
-      // 3. Deserialize the transaction
+      // 4. Deserialize the transaction
       const swapTransactionBuf = Buffer.from(swapTransaction, 'base64')
       const transaction = Transaction.from(swapTransactionBuf)
 
-      // 4. Add recent blockhash and fee payer
+      if (!merchantAccountExists) {
+        console.log("Creating merchant token account")
+        const createAtaIx = createAssociatedTokenAccountInstruction(
+          publicKey, // payer
+          merchantTokenAccount, // ata
+          merchantPubKey, // owner
+          new PublicKey(MERCHANT_TOKEN) // mint
+        )
+        transaction.instructions.unshift(createAtaIx)
+      }
+
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
       transaction.recentBlockhash = blockhash
       transaction.feePayer = publicKey
 
-
-      const senderTokenAccount = await getAssociatedTokenAddress(new PublicKey(MERCHANT_TOKEN), publicKey);  // Sender's token account
-      const receiverTokenAccount = await getAssociatedTokenAddress(new PublicKey(MERCHANT_TOKEN), new PublicKey(merchantAddress)); // Receiver's token account
-      console.log("Sender Token Account:", senderTokenAccount.toString())
-      console.log("Receiver Token Account:", receiverTokenAccount.toString())
-      const transferInstruction = createTransferInstruction(
-        senderTokenAccount,
-        receiverTokenAccount,
-        publicKey,
-        amount
-      );
-      //Adding the transfer instruction to the transaction so both the swap and transfer are executed together atomically
-      transaction.add(transferInstruction);
-      // 5. Send the transaction to the network
-      // This will trigger the wallet popup for user to confirm
       const signature = await sendTransaction(transaction, connection, {
         skipPreflight: true,
         maxRetries: 3
@@ -132,7 +143,6 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       console.log("Transaction sent! Signature:", signature)
       console.log("View in Explorer:", `https://explorer.solana.com/tx/${signature}?cluster=devnet`)
 
-      // 6. Wait for confirmation
       const confirmation = await connection.confirmTransaction({
         signature,
         blockhash,
@@ -151,7 +161,7 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
     } finally {
       setLoading(false)
     }
-  }, [publicKey, connection, amount, selectedToken, onSuccess])
+  }, [publicKey, connection, amount, selectedToken, merchantAddress, onSuccess])
 
   return (
     <div className="space-y-4">
@@ -172,4 +182,4 @@ export function PaymentForm({ amount, merchantAddress, onSuccess }: PaymentFormP
       </Button>
     </div>
   )
-} 
+}
